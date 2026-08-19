@@ -1,0 +1,239 @@
+@page "/schedule"
+@rendermode InteractiveServer
+@inject ScheduleApiClient ScheduleApiClient
+
+<PageTitle>Schedule</PageTitle>
+
+<div class="schedule-page">
+    <header class="schedule-header panel">
+        <p class="eyebrow">WORKSHOP SCHEDULE</p>
+        <h1>Two Days.<br />One Mission.</h1>
+        <p class="intro-copy">
+            Two focused days of collaboration, experimentation, mentoring, and building — from kickoff to final
+            presentations.
+        </p>
+
+        <div class="stats-grid">
+            <article>
+                <span class="stat-label">Duration</span>
+                <strong>2 DAYS</strong>
+            </article>
+            <article>
+                <span class="stat-label">Finalists</span>
+                <strong>4 FINAL IDEAS</strong>
+            </article>
+            <article>
+                <span class="stat-label">Stage</span>
+                <strong>1 FINAL PRESENTATION</strong>
+            </article>
+        </div>
+    </header>
+
+    <section class="day-selector panel" aria-label="Select workshop day">
+        @foreach (var option in _dayOptions)
+        {
+            <button type="button"
+                    class="day-chip @(option.DayNumber == _selectedDay ? "active" : string.Empty)"
+                    @onclick="() => SelectDayAsync(option.DayNumber)">
+                <span class="day-label">DAY @option.DayNumber.ToString("00")</span>
+                <span class="day-title">@option.Title</span>
+            </button>
+        }
+    </section>
+
+    @if (_hasError)
+    {
+        <section class="panel feedback-panel error-panel">
+            <h2>We couldn't load the schedule.</h2>
+            <button type="button" class="btn-primary-glow" @onclick="RetryAsync">Try Again</button>
+        </section>
+    }
+    else if (_isLoading)
+    {
+        <section class="panel timeline-shell" aria-live="polite" aria-busy="true">
+            <div class="timeline-list skeleton-list" aria-hidden="true">
+                @for (var i = 0; i < 6; i++)
+                {
+                    <article class="timeline-item skeleton-item">
+                        <div class="time-slot">
+                            <div class="skeleton-line sm"></div>
+                            <div class="skeleton-line sm"></div>
+                        </div>
+                        <div class="connector-col">
+                            <span class="timeline-dot"></span>
+                            <span class="timeline-line"></span>
+                        </div>
+                        <div class="event-card panel">
+                            <div class="skeleton-line md"></div>
+                            <div class="skeleton-line"></div>
+                            <div class="skeleton-line"></div>
+                            <div class="skeleton-line sm"></div>
+                        </div>
+                    </article>
+                }
+            </div>
+        </section>
+    }
+    else
+    {
+        <section class="panel timeline-shell">
+            <div class="timeline-list">
+                @foreach (var item in _scheduleItems)
+                {
+                    var activityStateLabel = GetActivityStateLabel(item);
+
+                    <article class="timeline-item @GetTimelineItemCssClass(item)">
+                        <div class="time-slot">
+                            <p class="time-value">@FormatTime(item.StartTime)</p>
+                            <p class="time-separator">—</p>
+                            <p class="time-value">@FormatTime(item.EndTime)</p>
+                        </div>
+
+                        <div class="connector-col" aria-hidden="true">
+                            <span class="timeline-dot"></span>
+                            <span class="timeline-line"></span>
+                        </div>
+
+                        <div class="event-card panel @GetCardTypeCssClass(item.Type)">
+                            <div class="event-header-row">
+                                <span class="type-badge">@GetTypeIcon(item.Type) @GetTypeLabel(item.Type)</span>
+
+                                @if (activityStateLabel is not null)
+                                {
+                                    <span class="state-badge">@activityStateLabel</span>
+                                }
+                            </div>
+
+                            <h2>@item.Title</h2>
+
+                            @if (!string.IsNullOrWhiteSpace(item.Description))
+                            {
+                                <p class="description">@item.Description</p>
+                            }
+
+                            @if (!string.IsNullOrWhiteSpace(item.Location))
+                            {
+                                <p class="location">📍 @item.Location</p>
+                            }
+                        </div>
+                    </article>
+                }
+            </div>
+        </section>
+    }
+</div>
+
+@code {
+    private readonly IReadOnlyList<(int DayNumber, string Title)> _dayOptions =
+    [
+        (1, "Build & Explore"),
+        (2, "Refine & Present")
+    ];
+
+    private readonly int? _nowItemId;
+    private readonly int? _upNextItemId;
+
+    private List<ScheduleItemDto> _scheduleItems = [];
+    private int _selectedDay = 1;
+    private bool _isLoading = true;
+    private bool _hasError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadScheduleAsync(_selectedDay);
+    }
+
+    private async Task SelectDayAsync(int dayNumber)
+    {
+        if (dayNumber == _selectedDay || _isLoading)
+        {
+            return;
+        }
+
+        _selectedDay = dayNumber;
+        await LoadScheduleAsync(dayNumber);
+    }
+
+    private async Task RetryAsync()
+    {
+        await LoadScheduleAsync(_selectedDay);
+    }
+
+    private async Task LoadScheduleAsync(int dayNumber)
+    {
+        _isLoading = true;
+        _hasError = false;
+
+        try
+        {
+            _scheduleItems = (await ScheduleApiClient.GetScheduleByDayAsync(dayNumber)).ToList();
+        }
+        catch
+        {
+            _hasError = true;
+            _scheduleItems = [];
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private string? GetActivityStateLabel(ScheduleItemDto item)
+    {
+        if (_nowItemId.HasValue && item.Id == _nowItemId.Value)
+        {
+            return "NOW";
+        }
+
+        if (_upNextItemId.HasValue && item.Id == _upNextItemId.Value)
+        {
+            return "UP NEXT";
+        }
+
+        return null;
+    }
+
+    private static string FormatTime(TimeSpan value)
+    {
+        return DateTime.Today.Add(value).ToString("HH:mm");
+    }
+
+    private static string GetTypeLabel(ScheduleItemType type) => type switch
+    {
+        ScheduleItemType.TeamWork => "Team Work",
+        _ => type.ToString()
+    };
+
+    private static string GetTypeIcon(ScheduleItemType type) => type switch
+    {
+        ScheduleItemType.Opening => "✦",
+        ScheduleItemType.Workshop => "⚡",
+        ScheduleItemType.TeamWork => "🛠",
+        ScheduleItemType.Mentoring => "🧭",
+        ScheduleItemType.Break => "☕",
+        ScheduleItemType.Meal => "🍽",
+        ScheduleItemType.Presentation => "🎤",
+        ScheduleItemType.Closing => "✓",
+        _ => "•"
+    };
+
+    private static string GetCardTypeCssClass(ScheduleItemType type) => type switch
+    {
+        ScheduleItemType.Break => "type-break",
+        ScheduleItemType.Meal => "type-meal",
+        ScheduleItemType.Workshop => "type-workshop",
+        ScheduleItemType.Mentoring => "type-mentoring",
+        ScheduleItemType.Presentation => "type-presentation",
+        ScheduleItemType.Opening => "type-opening",
+        ScheduleItemType.Closing => "type-closing",
+        _ => "type-general"
+    };
+
+    private static string GetTimelineItemCssClass(ScheduleItemDto item)
+    {
+        return item.Type is ScheduleItemType.Break or ScheduleItemType.Meal
+            ? "quiet-item"
+            : string.Empty;
+    }
+}

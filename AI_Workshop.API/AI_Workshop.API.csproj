@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>AI-Workshop-API-2E5157FA-6CD2-4688-B2D5-0B92D3F7A8E3</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.10" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AI_Workshop.AI\AI_Workshop.AI.csproj" />
+    <ProjectReference Include="..\AI_Workshop.Application\AI_Workshop.Application.csproj" />
+    <ProjectReference Include="..\AI_Workshop.Infrastructure\AI_Workshop.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

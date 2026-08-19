@@ -1,0 +1,283 @@
+@page "/ideas/{Id:int}"
+@rendermode InteractiveServer
+@inject IdeasApiClient IdeasApiClient
+@inject TeamsApiClient TeamsApiClient
+
+<PageTitle>Idea Details</PageTitle>
+
+@if (_isLoading)
+{
+    <section class="panel details-shell loading-shell" aria-hidden="true">
+        <div class="line lg"></div>
+        <div class="line"></div>
+        <div class="line"></div>
+        <div class="line sm"></div>
+    </section>
+}
+else if (_hasError)
+{
+    <section class="panel details-shell feedback-shell">
+        <h1>We couldn't load this idea.</h1>
+        <button type="button" class="btn-primary-glow" @onclick="LoadIdeaAsync">Try Again</button>
+        <a href="/ideas" class="btn-secondary-minimal">Back to Ideas</a>
+    </section>
+}
+else if (_idea is null)
+{
+    <section class="panel details-shell feedback-shell">
+        <h1>Idea not found.</h1>
+        <a href="/ideas" class="btn-secondary-minimal">Back to Ideas</a>
+    </section>
+}
+else
+{
+    <div class="details-page">
+        <a href="/ideas" class="back-link">← Back to Ideas</a>
+
+        <section class="panel idea-hero @(_idea.Status == IdeaStatus.Selected ? "hero-finalist" : string.Empty)">
+            <div class="hero-meta">
+                <span class="category-badge @GetCategoryCssClass(_idea.Category)">@GetCategoryLabel(_idea.Category)</span>
+                <span class="status-badge @GetStatusCssClass(_idea.Status)">
+                    @if (_idea.Status == IdeaStatus.Selected)
+                    {
+                        <span>★</span>
+                    }
+                    @GetStatusLabel(_idea.Status)
+                </span>
+            </div>
+
+            <h1 class="hero-title">@_idea.Title</h1>
+            <p class="hero-description">@_idea.Description</p>
+
+            <div class="leader-block">
+                <span class="leader-icon" aria-hidden="true">👤</span>
+                <div>
+                    <p class="leader-label">TEAM LEADER</p>
+                    <p class="leader-name">@_idea.TeamLeaderName</p>
+                    @if (!string.IsNullOrWhiteSpace(_idea.TeamLeaderEmail))
+                    {
+                        <p class="leader-email">@_idea.TeamLeaderEmail</p>
+                    }
+                </div>
+            </div>
+        </section>
+
+        <section class="details-grid">
+            <article class="panel profile-card challenge-card">
+                <header class="section-headline">
+                    <span class="section-icon" aria-hidden="true">◎</span>
+                    <h3>THE CHALLENGE</h3>
+                </header>
+                <p>@_idea.ProblemToSolve</p>
+            </article>
+
+            <article class="panel profile-card solution-card">
+                <header class="section-headline">
+                    <span class="section-icon" aria-hidden="true">✦</span>
+                    <h3>THE SOLUTION</h3>
+                </header>
+                <p>@_idea.ProposedSolution</p>
+            </article>
+
+            <article class="panel profile-card benefits-card">
+                <header class="section-headline">
+                    <span class="section-icon" aria-hidden="true">◉</span>
+                    <h3>WHO BENEFITS</h3>
+                </header>
+                <p>@_idea.TargetUsers</p>
+            </article>
+
+            <article class="panel profile-card impact-card">
+                <header class="section-headline">
+                    <span class="section-icon" aria-hidden="true">↗</span>
+                    <h3>EXPECTED IMPACT</h3>
+                </header>
+                <p>@_idea.ExpectedValue</p>
+            </article>
+        </section>
+
+        <section class="panel profile-card tech-stack-card">
+            <header class="section-headline">
+                <span class="section-icon" aria-hidden="true">&lt;/&gt;</span>
+                <h3>TECHNOLOGY STACK</h3>
+            </header>
+            <div class="tech-stack-list">
+                @foreach (var tag in GetTechnologyTags(_idea.ToolsAndTechnologies))
+                {
+                    <span class="tech-tag">@tag</span>
+                }
+            </div>
+        </section>
+
+        @if (_idea.Status == IdeaStatus.Selected)
+        {
+            <section class="panel finalist-banner">
+                <p>FINALIST IDEA</p>
+                <h2>This idea has been selected as one of the four AI Workshop finalists.</h2>
+                <span>Finalist team architecture is prepared for upcoming team formation phases.</span>
+            </section>
+
+            @if (_team is not null)
+            {
+                <section class="panel profile-card team-section">
+                    <div class="team-headline">
+                        <h3>TEAM FORMATION</h3>
+                        <span class="team-badge">Registration not open yet</span>
+                    </div>
+
+                    <div class="split-grid team-summary-grid">
+                        <article>
+                            <h4>Team Name</h4>
+                            <p>@_team.TeamName</p>
+                        </article>
+                        <article>
+                            <h4>Team Leader</h4>
+                            <p>@GetTeamLeaderName(_team, _idea)</p>
+                        </article>
+                        <article>
+                            <h4>Current Members</h4>
+                            <p>@_team.CurrentMemberCount</p>
+                        </article>
+                        <article>
+                            <h4>Maximum Members</h4>
+                            <p>@_team.MaxMembers</p>
+                        </article>
+                    </div>
+
+                    @if (_team.TeamMembers.Count > 0)
+                    {
+                        <div class="team-members">
+                            <h4>Members</h4>
+                            <ul>
+                                @foreach (var member in _team.TeamMembers)
+                                {
+                                    <li>
+                                        <span>@member.EmployeeName</span>
+                                        @if (member.IsTeamLeader)
+                                        {
+                                            <strong>Leader</strong>
+                                        }
+                                    </li>
+                                }
+                            </ul>
+                        </div>
+                    }
+                </section>
+            }
+        }
+
+        @if (!string.IsNullOrWhiteSpace(_idea.AdditionalNotes))
+        {
+            <section class="panel profile-card additional-notes-card">
+                <header class="section-headline">
+                    <span class="section-icon" aria-hidden="true">⋯</span>
+                    <h3>ADDITIONAL NOTES</h3>
+                </header>
+                <p>@_idea.AdditionalNotes</p>
+            </section>
+        }
+
+        <section class="panel profile-card submission-card">
+            <header class="section-headline">
+                <span class="section-icon" aria-hidden="true">◌</span>
+                <h3>SUBMISSION</h3>
+            </header>
+            <div class="split-grid submission-grid">
+                <article>
+                    <h4>Submitted By</h4>
+                    <p>@_idea.SubmittedBy</p>
+                </article>
+                <article>
+                    <h4>Submitted Date</h4>
+                    <p>@_idea.SubmittedDate.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</p>
+                </article>
+            </div>
+        </section>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private IdeaDto? _idea;
+    private WorkshopTeamDto? _team;
+    private bool _isLoading = true;
+    private bool _hasError;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadIdeaAsync();
+    }
+
+    private async Task LoadIdeaAsync()
+    {
+        _isLoading = true;
+        _hasError = false;
+        _team = null;
+
+        try
+        {
+            _idea = await IdeasApiClient.GetIdeaByIdAsync(Id);
+            if (_idea?.Status == IdeaStatus.Selected)
+            {
+                _team = await TeamsApiClient.GetTeamByIdeaIdAsync(_idea.Id);
+            }
+        }
+        catch
+        {
+            _hasError = true;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private static string GetCategoryLabel(IdeaCategory category) => category switch
+    {
+        IdeaCategory.DataAndAnalytics => "Data & Analytics",
+        IdeaCategory.ProcessImprovement => "Process Improvement",
+        IdeaCategory.DeveloperTools => "Developer Tools",
+        _ => category.ToString()
+    };
+
+    private static string GetStatusLabel(IdeaStatus status) => status switch
+    {
+        IdeaStatus.NotSelected => "Not Selected",
+        IdeaStatus.Selected => "FINALIST",
+        _ => "Submitted"
+    };
+
+    private static string GetStatusCssClass(IdeaStatus status) => status switch
+    {
+        IdeaStatus.Selected => "status-selected",
+        IdeaStatus.NotSelected => "status-not-selected",
+        _ => "status-submitted"
+    };
+
+    private static string GetCategoryCssClass(IdeaCategory category) => category switch
+    {
+        IdeaCategory.AI => "cat-ai",
+        IdeaCategory.Automation => "cat-automation",
+        IdeaCategory.DataAndAnalytics => "cat-data",
+        IdeaCategory.ProcessImprovement => "cat-process",
+        IdeaCategory.DeveloperTools => "cat-dev",
+        _ => "cat-other"
+    };
+
+    private static IReadOnlyList<string> GetTechnologyTags(string rawValue)
+    {
+        return rawValue
+            .Split([',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(tag => !string.IsNullOrWhiteSpace(tag))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    private static string GetTeamLeaderName(WorkshopTeamDto team, IdeaDto idea)
+    {
+        return team.TeamMembers.FirstOrDefault(member => member.IsTeamLeader)?.EmployeeName
+               ?? idea.TeamLeaderName;
+    }
+}

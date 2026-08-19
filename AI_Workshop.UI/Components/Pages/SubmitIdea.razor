@@ -1,0 +1,630 @@
+@page "/submit-idea"
+@rendermode InteractiveServer
+@inject IdeasApiClient IdeasApiClient
+@inject IdeaAssistantApiClient IdeaAssistantApiClient
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JS
+
+<PageTitle>Submit Idea</PageTitle>
+
+<div class="submit-idea-page">
+    <header class="panel page-header">
+        <p class="eyebrow">IDEA SUBMISSION</p>
+        <h1>Submit Your AI Workshop Idea</h1>
+        <p class="intro-copy">Share the challenge, your proposed solution, and the impact your team can deliver.</p>
+    </header>
+
+    @if (_submittedIdeaId.HasValue)
+    {
+        <section class="panel result-panel success">
+            <h2>Idea submitted successfully.</h2>
+            <p>Your idea has been saved in the workshop database.</p>
+            <div class="actions">
+                <a class="btn-primary-glow" href="@($"/ideas/{_submittedIdeaId.Value}")">View Submitted Idea</a>
+                <a class="btn-secondary-minimal" href="/ideas">Explore Ideas</a>
+            </div>
+        </section>
+    }
+    else
+    {
+        <EditForm Model="_model" OnValidSubmit="SubmitAsync" class="panel form-panel">
+            <DataAnnotationsValidator />
+
+            <section class="panel section-card">
+                <div class="section-heading">
+                    <p class="section-number">01</p>
+                    <h2>Idea Overview</h2>
+                </div>
+
+                <div class="form-grid two-columns">
+                    <div class="field-block field-title @GetFieldHighlightClass("Title")">
+                        <label for="title">Idea Title <span class="required">*</span></label>
+                        <InputText id="title" @bind-Value="_model.Title" placeholder="AI assistant for onboarding playbooks" />
+                        <ValidationMessage For="() => _model.Title" />
+                    </div>
+
+                    <div class="field-block field-category @GetFieldHighlightClass("Category")">
+                        <label for="category">Category <span class="required">*</span></label>
+                        <InputSelect id="category" @bind-Value="_model.Category">
+                            @foreach (var category in Enum.GetValues<IdeaCategory>())
+                            {
+                                <option value="@category">@GetCategoryLabel(category)</option>
+                            }
+                        </InputSelect>
+                    </div>
+
+                    <div class="field-block">
+                        <label for="teamLeaderName">Team Leader Name <span class="required">*</span></label>
+                        <InputText id="teamLeaderName" @bind-Value="_model.TeamLeaderName" placeholder="Bob Jacob" />
+                        <ValidationMessage For="() => _model.TeamLeaderName" />
+                    </div>
+
+                    <div class="field-block">
+                        <label for="teamLeaderEmail">Team Leader Email <span class="required">*</span></label>
+                        <InputText id="teamLeaderEmail" type="email" @bind-Value="_model.TeamLeaderEmail" placeholder="Bobj@iscar.co.il" />
+                        <ValidationMessage For="() => _model.TeamLeaderEmail" />
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel section-card">
+                <div class="section-heading">
+                    <p class="section-number">02</p>
+                    <h2>The Challenge</h2>
+                </div>
+
+                <div class="field-block field-description @GetFieldHighlightClass("Description")">
+                    <label for="description">Describe Your Idea <span class="required">*</span></label>
+                    <InputTextArea id="description" @bind-Value="_model.Description" rows="3" placeholder="Summarize the concept and what makes it valuable." />
+                    <ValidationMessage For="() => _model.Description" />
+                </div>
+
+                <div class="form-grid two-columns">
+                    <div class="field-block field-problemToSolve @GetFieldHighlightClass("ProblemToSolve")">
+                        <label for="problemToSolve">What Problem Does It Solve? <span class="required">*</span></label>
+                        <InputTextArea id="problemToSolve" @bind-Value="_model.ProblemToSolve" rows="3" placeholder="Manual review cycles delay delivery and reduce quality." />
+                        <ValidationMessage For="() => _model.ProblemToSolve" />
+                    </div>
+
+                    <div class="field-block field-targetUsers @GetFieldHighlightClass("TargetUsers")">
+                        <label for="targetUsers">Who Will Use or Benefit From It? <span class="required">*</span></label>
+                        <InputTextArea id="targetUsers" @bind-Value="_model.TargetUsers" rows="3" placeholder="Engineering leads, QA teams, and project managers." />
+                        <ValidationMessage For="() => _model.TargetUsers" />
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel section-card">
+                <div class="section-heading">
+                    <p class="section-number">03</p>
+                    <h2>Your Solution</h2>
+                </div>
+
+                <div class="field-block field-proposedSolution @GetFieldHighlightClass("ProposedSolution")">
+                    <label for="proposedSolution">Proposed Solution</label>
+                    <InputTextArea id="proposedSolution" @bind-Value="_model.ProposedSolution" rows="3" placeholder="Describe the workflow, automation, and expected user experience." />
+                </div>
+
+                <div class="field-block field-toolsAndTechnologies @GetFieldHighlightClass("ToolsAndTechnologies")">
+                    <label for="toolsAndTechnologies">Tools &amp; AI Technologies</label>
+                    <InputText id="toolsAndTechnologies" @bind-Value="_model.ToolsAndTechnologies" placeholder="ChatGPT, GitHub Copilot, Python, SQL Server..." />
+                </div>
+            </section>
+
+            <section class="panel section-card">
+                <div class="section-heading">
+                    <p class="section-number">04</p>
+                    <h2>Expected Impact</h2>
+                </div>
+
+                <div class="form-grid two-columns">
+                    <div class="field-block field-expectedValue @GetFieldHighlightClass("ExpectedValue")">
+                        <label for="expectedValue">Expected Value / Impact</label>
+                        <InputTextArea id="expectedValue" @bind-Value="_model.ExpectedValue" rows="3" placeholder="Reduce effort by 30%, improve consistency, and shorten release cycles." />
+                    </div>
+
+                    <div class="field-block field-additionalNotes @GetFieldHighlightClass("AdditionalNotes")">
+                        <label for="additionalNotes">Additional Notes (Optional)</label>
+                        <InputTextArea id="additionalNotes" @bind-Value="_model.AdditionalNotes" rows="3" placeholder="Dependencies, rollout considerations, or support needed." />
+                    </div>
+                </div>
+            </section>
+
+            @if (!string.IsNullOrWhiteSpace(_errorMessage))
+            {
+                <p class="submit-message error">@_errorMessage</p>
+            }
+
+            <div class="actions submit-actions">
+                <div class="action-copy">Ready to turn your idea into impact?</div>
+                <button type="submit" class="btn-primary-glow" disabled="@_isSubmitting">@(_isSubmitting ? "Submitting..." : "Submit Idea →")</button>
+                <button type="button" class="btn-secondary-minimal" @onclick="BackToIdeas">Explore Ideas</button>
+            </div>
+        </EditForm>
+
+        <div class="assistant-floating-container">
+            @if (_isAssistantOpen)
+            {
+                <section class="assistant-popup panel" aria-label="AI Idea Assistant">
+                    <header class="assistant-banner">
+                        <div class="assistant-banner-overlay">
+                            <div>
+                                <p class="assistant-kicker">AI IDEA ASSISTANT</p>
+                                <p class="assistant-subtitle">Let's shape your idea together.</p>
+                            </div>
+                            <div class="assistant-header-actions">
+                                <button type="button" class="btn-secondary-minimal assistant-start-over" @onclick="PromptStartOver">Start Over</button>
+                                <button type="button" class="assistant-close" @onclick="CloseAssistant" aria-label="Close assistant">✕</button>
+                            </div>
+                        </div>
+                    </header>
+
+                    @if (_showStartOverConfirm)
+                    {
+                        <div class="assistant-confirm-reset">
+                            <p>Start over and clear this chat conversation?</p>
+                            <div class="assistant-confirm-actions">
+                                <button type="button" class="btn-secondary-minimal" @onclick="CancelStartOver">Cancel</button>
+                                <button type="button" class="btn-primary-glow" @onclick="StartOverConversation">Start Over</button>
+                            </div>
+                        </div>
+                    }
+
+                    <div class="assistant-messages" id="assistant-chat-body">
+                        @foreach (var message in _assistantConversation)
+                        {
+                            <article class="assistant-message @(message.IsAssistant ? "assistant" : "user") @(ContainsHebrew(message.Content) ? "hebrew-message" : string.Empty)">
+                                @if (message.IsAssistant)
+                                {
+                                    <span class="assistant-message-indicator" aria-hidden="true">✦</span>
+                                }
+                                <p>@message.Content</p>
+                            </article>
+                        }
+
+                        @if (_isAssistantBusy)
+                        {
+                            <article class="assistant-message assistant typing-indicator">
+                                <span></span><span></span><span></span>
+                            </article>
+                        }
+                    </div>
+
+                    @if (_assistantUpdatedFields.Count > 0)
+                    {
+                        <p class="assistant-updated-fields">✓ Form updated: @string.Join(", ", _assistantUpdatedFields)</p>
+                    }
+
+                    @if (!string.IsNullOrWhiteSpace(_assistantErrorMessage))
+                    {
+                        <p class="submit-message error">@_assistantErrorMessage</p>
+                    }
+
+                    <div class="assistant-composer">
+                        <textarea class="assistant-input @(ContainsHebrew(_assistantInput) ? "hebrew-text" : string.Empty)"
+                                  id="assistant-chat-input"
+                                  @bind="_assistantInput"
+                                  @bind:event="oninput"
+                                  onkeydown="if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); }"
+                                  @onkeyup="HandleAssistantInputKeyUp"
+                                  rows="3"
+                                  placeholder="Tell me about your idea..."
+                                  disabled="@_isAssistantBusy"></textarea>
+                        <div class="assistant-composer-footer">
+                            <button type="button"
+                                    class="btn-primary-glow assistant-send-button"
+                                    @onclick="SendAssistantMessageAsync"
+                                    aria-label="Send message to AI assistant"
+                                    disabled="@_isAssistantBusy">@(_isAssistantBusy ? "Thinking..." : "Send ➜")</button>
+                        </div>
+                    </div>
+                </section>
+            }
+
+            <button type="button" class="assistant-launcher" @onclick="ToggleAssistant" aria-expanded="@_isAssistantOpen" aria-label="Open AI Idea Assistant">
+                <span class="assistant-launcher-icon">✦</span>
+                <span class="assistant-launcher-text">Idea Assistant</span>
+                @if (_hasUnreadAssistantUpdate)
+                {
+                    <span class="assistant-unread-dot" aria-hidden="true"></span>
+                }
+            </button>
+        </div>
+    }
+</div>
+
+@code {
+    private const string InitialAssistantMessage = "Tell me about your idea and I'll help you fill in the submission form.\n\nYou can write in Hebrew or English. I'll organize the final form in English.";
+
+    private readonly SubmitIdeaFormModel _model = new();
+    private readonly List<AssistantMessage> _assistantConversation = [];
+    private bool _isSubmitting;
+    private bool _isAssistantBusy;
+    private bool _isAssistantOpen;
+    private bool _showStartOverConfirm;
+    private bool _hasUnreadAssistantUpdate;
+    private string _errorMessage = string.Empty;
+    private string _assistantErrorMessage = string.Empty;
+    private string _assistantInput = string.Empty;
+    private string? _assistantConversationId;
+    private IReadOnlyCollection<string> _assistantUpdatedFields = [];
+    private readonly Dictionary<string, int> _fieldHighlightVersions = new(StringComparer.OrdinalIgnoreCase);
+    private int _fieldHighlightSequence;
+    private int? _submittedIdeaId;
+    private bool _shouldScrollAssistantToBottom;
+    private bool _shouldFocusAssistantInput;
+
+    protected override void OnInitialized()
+    {
+        _assistantConversation.Add(new AssistantMessage(InitialAssistantMessage, IsAssistant: true));
+    }
+
+    private async Task SubmitAsync()
+    {
+        _errorMessage = string.Empty;
+        _isSubmitting = true;
+
+        try
+        {
+            var created = await IdeasApiClient.CreateIdeaAsync(new CreateIdeaRequest
+            {
+                Title = _model.Title.Trim(),
+                Category = _model.Category,
+                Description = _model.Description.Trim(),
+                TeamLeaderName = _model.TeamLeaderName.Trim(),
+                TeamLeaderEmail = string.IsNullOrWhiteSpace(_model.TeamLeaderEmail) ? null : _model.TeamLeaderEmail.Trim(),
+                ProblemToSolve = _model.ProblemToSolve.Trim(),
+                ProposedSolution = _model.ProposedSolution?.Trim() ?? string.Empty,
+                TargetUsers = _model.TargetUsers.Trim(),
+                ToolsAndTechnologies = _model.ToolsAndTechnologies?.Trim() ?? string.Empty,
+                ExpectedValue = _model.ExpectedValue?.Trim() ?? string.Empty,
+                AdditionalNotes = string.IsNullOrWhiteSpace(_model.AdditionalNotes) ? null : _model.AdditionalNotes.Trim(),
+                SubmittedBy = string.IsNullOrWhiteSpace(_model.SubmittedBy) ? _model.TeamLeaderName.Trim() : _model.SubmittedBy.Trim()
+            });
+
+            _submittedIdeaId = created.Id;
+        }
+        catch
+        {
+            _errorMessage = "Unable to submit idea right now. Please try again.";
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+
+    private void BackToIdeas()
+    {
+        NavigationManager.NavigateTo("/ideas");
+    }
+
+    private void ToggleAssistant()
+    {
+        _isAssistantOpen = !_isAssistantOpen;
+        if (_isAssistantOpen)
+        {
+            _hasUnreadAssistantUpdate = false;
+            _shouldScrollAssistantToBottom = true;
+            _shouldFocusAssistantInput = true;
+        }
+
+        _showStartOverConfirm = false;
+    }
+
+    private void CloseAssistant()
+    {
+        _isAssistantOpen = false;
+        _showStartOverConfirm = false;
+        _shouldFocusAssistantInput = false;
+    }
+
+    private void PromptStartOver()
+    {
+        _showStartOverConfirm = true;
+    }
+
+    private void CancelStartOver()
+    {
+        _showStartOverConfirm = false;
+        _shouldFocusAssistantInput = true;
+    }
+
+    private void StartOverConversation()
+    {
+        _assistantConversation.Clear();
+        _assistantConversation.Add(new AssistantMessage(InitialAssistantMessage, IsAssistant: true));
+        _assistantConversationId = null;
+        _assistantUpdatedFields = [];
+        _assistantErrorMessage = string.Empty;
+        _assistantInput = string.Empty;
+        _showStartOverConfirm = false;
+        _hasUnreadAssistantUpdate = false;
+        _shouldFocusAssistantInput = true;
+    }
+
+    private async Task SendAssistantMessageAsync()
+    {
+        if (_isAssistantBusy)
+        {
+            return;
+        }
+
+        var message = _assistantInput.Trim();
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return;
+        }
+
+        _assistantErrorMessage = string.Empty;
+        _assistantUpdatedFields = [];
+        _showStartOverConfirm = false;
+        _assistantConversation.Add(new AssistantMessage(message, IsAssistant: false));
+        _shouldScrollAssistantToBottom = true;
+        _assistantInput = string.Empty;
+        _isAssistantBusy = true;
+
+        try
+        {
+            var response = await IdeaAssistantApiClient.ChatAsync(new IdeaAssistantChatRequest
+            {
+                Message = message,
+                ConversationId = _assistantConversationId,
+                CurrentForm = BuildCurrentFormSuggestion(),
+                Conversation = _assistantConversation
+                    .Select(item => new IdeaAssistantConversationMessage
+                    {
+                        Role = item.IsAssistant ? "assistant" : "user",
+                        Content = item.Content
+                    })
+                    .ToArray()
+            });
+
+            _assistantConversationId = response.ConversationId;
+            _assistantUpdatedFields = response.UpdatedFields ?? [];
+
+            if (!string.IsNullOrWhiteSpace(response.AssistantMessage))
+            {
+                _assistantConversation.Add(new AssistantMessage(response.AssistantMessage, IsAssistant: true));
+
+                if (!_isAssistantOpen)
+                {
+                    _hasUnreadAssistantUpdate = true;
+                }
+
+                _shouldScrollAssistantToBottom = true;
+            }
+
+            ApplyFormUpdates(response.FormUpdates);
+
+            if (response.FormUpdates is not null && !_isAssistantOpen)
+            {
+                _hasUnreadAssistantUpdate = true;
+            }
+        }
+        catch (InvalidOperationException ex)
+        {
+            _assistantErrorMessage = ex.Message;
+
+            if (!_isAssistantOpen)
+            {
+                _hasUnreadAssistantUpdate = true;
+            }
+        }
+        catch
+        {
+            _assistantErrorMessage = "Unable to reach the AI assistant right now. You can still submit the form manually.";
+
+            if (!_isAssistantOpen)
+            {
+                _hasUnreadAssistantUpdate = true;
+            }
+        }
+        finally
+        {
+            _isAssistantBusy = false;
+            _shouldScrollAssistantToBottom = true;
+            _shouldFocusAssistantInput = true;
+        }
+    }
+
+    private async Task HandleAssistantInputKeyUp(KeyboardEventArgs args)
+    {
+        if (_isAssistantBusy)
+        {
+            return;
+        }
+
+        if (args.Key == "Enter" && !args.ShiftKey)
+        {
+            await SendAssistantMessageAsync();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_isAssistantOpen && _shouldScrollAssistantToBottom)
+        {
+            _shouldScrollAssistantToBottom = false;
+            await JS.InvokeVoidAsync("assistantChat.scrollToBottom", "assistant-chat-body");
+        }
+
+        if (_isAssistantOpen && !_isAssistantBusy && !_showStartOverConfirm && _shouldFocusAssistantInput)
+        {
+            _shouldFocusAssistantInput = false;
+            await JS.InvokeVoidAsync("assistantChat.focusInput", "assistant-chat-input");
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    private IdeaAssistantFormSuggestion BuildCurrentFormSuggestion()
+    {
+        return new IdeaAssistantFormSuggestion
+        {
+            Title = _model.Title,
+            Category = _model.Category.ToString(),
+            Description = _model.Description,
+            ProblemToSolve = _model.ProblemToSolve,
+            ProposedSolution = _model.ProposedSolution,
+            TargetUsers = _model.TargetUsers,
+            ToolsAndTechnologies = _model.ToolsAndTechnologies,
+            ExpectedValue = _model.ExpectedValue,
+            AdditionalNotes = _model.AdditionalNotes
+        };
+    }
+
+    private void ApplyFormUpdates(IdeaAssistantFormSuggestion? updates)
+    {
+        if (updates is null)
+        {
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(updates.Title))
+        {
+            _model.Title = updates.Title.Trim();
+            HighlightField("Title");
+        }
+
+        if (!string.IsNullOrWhiteSpace(updates.Category) && TryParseCategory(updates.Category, out var category))
+        {
+            _model.Category = category;
+            HighlightField("Category");
+        }
+
+        if (!string.IsNullOrWhiteSpace(updates.Description))
+        {
+            _model.Description = updates.Description.Trim();
+            HighlightField("Description");
+        }
+
+        if (!string.IsNullOrWhiteSpace(updates.ProblemToSolve))
+        {
+            _model.ProblemToSolve = updates.ProblemToSolve.Trim();
+            HighlightField("ProblemToSolve");
+        }
+
+        if (!string.IsNullOrWhiteSpace(updates.ProposedSolution))
+        {
+            _model.ProposedSolution = updates.ProposedSolution.Trim();
+            HighlightField("ProposedSolution");
+        }
+
+        if (!string.IsNullOrWhiteSpace(updates.TargetUsers))
+        {
+            _model.TargetUsers = updates.TargetUsers.Trim();
+            HighlightField("TargetUsers");
+        }
+
+        if (!string.IsNullOrWhiteSpace(updates.ToolsAndTechnologies))
+        {
+            _model.ToolsAndTechnologies = updates.ToolsAndTechnologies.Trim();
+            HighlightField("ToolsAndTechnologies");
+        }
+
+        if (!string.IsNullOrWhiteSpace(updates.ExpectedValue))
+        {
+            _model.ExpectedValue = updates.ExpectedValue.Trim();
+            HighlightField("ExpectedValue");
+        }
+
+        if (!string.IsNullOrWhiteSpace(updates.AdditionalNotes))
+        {
+            _model.AdditionalNotes = updates.AdditionalNotes.Trim();
+            HighlightField("AdditionalNotes");
+        }
+    }
+
+    private string GetFieldHighlightClass(string fieldName)
+    {
+        return _fieldHighlightVersions.ContainsKey(fieldName) ? "ai-field-updated" : string.Empty;
+    }
+
+    private void HighlightField(string fieldName)
+    {
+        var version = ++_fieldHighlightSequence;
+        _fieldHighlightVersions[fieldName] = version;
+        _ = ClearFieldHighlightAsync(fieldName, version);
+    }
+
+    private async Task ClearFieldHighlightAsync(string fieldName, int version)
+    {
+        await Task.Delay(2200);
+
+        if (_fieldHighlightVersions.TryGetValue(fieldName, out var currentVersion) && currentVersion == version)
+        {
+            _fieldHighlightVersions.Remove(fieldName);
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private static bool TryParseCategory(string categoryText, out IdeaCategory category)
+    {
+        if (Enum.TryParse<IdeaCategory>(categoryText, ignoreCase: true, out category))
+        {
+            return true;
+        }
+
+        var normalized = categoryText.Replace(" ", string.Empty).Replace("&", "And", StringComparison.OrdinalIgnoreCase);
+        return Enum.TryParse<IdeaCategory>(normalized, ignoreCase: true, out category);
+    }
+
+    private static string GetCategoryLabel(IdeaCategory category) => category switch
+    {
+        IdeaCategory.DataAndAnalytics => "Data & Analytics",
+        IdeaCategory.ProcessImprovement => "Process Improvement",
+        IdeaCategory.DeveloperTools => "Developer Tools",
+        _ => category.ToString()
+    };
+
+    private static bool ContainsHebrew(string? text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return false;
+        }
+
+        foreach (var ch in text)
+        {
+            if (ch >= '\u0590' && ch <= '\u05FF')
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private sealed class SubmitIdeaFormModel
+    {
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = false)]
+        public string Title { get; set; } = string.Empty;
+
+        public IdeaCategory Category { get; set; } = IdeaCategory.AI;
+
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = false)]
+        public string Description { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = false)]
+        public string TeamLeaderName { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.EmailAddress]
+        public string? TeamLeaderEmail { get; set; }
+
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = false)]
+        public string ProblemToSolve { get; set; } = string.Empty;
+
+        public string? ProposedSolution { get; set; }
+
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = false)]
+        public string TargetUsers { get; set; } = string.Empty;
+
+        public string? ToolsAndTechnologies { get; set; }
+        public string? ExpectedValue { get; set; }
+        public string? AdditionalNotes { get; set; }
+        public string? SubmittedBy { get; set; }
+    }
+
+    private sealed record AssistantMessage(string Content, bool IsAssistant);
+}

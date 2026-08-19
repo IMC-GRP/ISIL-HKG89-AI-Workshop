@@ -1,0 +1,184 @@
+@page "/ideas"
+@rendermode InteractiveServer
+@inject IdeasApiClient IdeasApiClient
+
+<PageTitle>Idea Gallery</PageTitle>
+
+<div class="ideas-page">
+    <header class="ideas-header panel">
+        <p class="eyebrow">IDEA GALLERY</p>
+        <h1>Explore the Ideas</h1>
+        <p class="intro-copy">
+            Discover the ideas submitted for the AI Workshop. Explore technologies and the
+            potential impact behind each proposal.
+        </p>
+
+        <div class="stats-grid">
+            <article>
+                <span class="stat-label">Total Ideas</span>
+                <strong>@_ideas.Count</strong>
+            </article>
+            <article>
+                <span class="stat-label">Submitted</span>
+                <strong>@_ideas.Count(idea => idea.Status == IdeaStatus.Submitted)</strong>
+            </article>
+            <article>
+                <span class="stat-label">Finalists</span>
+                <strong>@_ideas.Count(idea => idea.Status == IdeaStatus.Selected)</strong>
+            </article>
+        </div>
+    </header>
+
+    @if (_hasError)
+    {
+        <section class="panel feedback-panel error-panel">
+            <h2>We couldn't load the ideas.</h2>
+            <button type="button" class="btn-primary-glow" @onclick="LoadIdeasAsync">Try Again</button>
+        </section>
+    }
+    else if (_isLoading)
+    {
+        <section class="ideas-grid">
+            @for (var i = 0; i < 6; i++)
+            {
+                <article class="panel idea-card skeleton-card" aria-hidden="true">
+                    <div class="skeleton-line sm"></div>
+                    <div class="skeleton-line"></div>
+                    <div class="skeleton-line"></div>
+                    <div class="skeleton-line lg"></div>
+                </article>
+            }
+        </section>
+    }
+    else if (_ideas.Count == 0)
+    {
+        <section class="panel feedback-panel">
+            <h2>No ideas yet.</h2>
+            <p>Be the first to submit an idea for the AI Workshop.</p>
+            <a class="btn-primary-glow" href="/submit-idea">Submit an Idea</a>
+        </section>
+    }
+    else
+    {
+        <section class="ideas-grid">
+            @foreach (var idea in DisplayedIdeas)
+            {
+                var techTags = GetTechnologyTags(idea.ToolsAndTechnologies);
+                var visibleTags = techTags.Take(3).ToArray();
+                var remainingTags = techTags.Count - visibleTags.Length;
+
+                <article class="panel idea-card @(idea.Status == IdeaStatus.Selected ? "finalist-card" : string.Empty)">
+                    <div class="card-header">
+                        <span class="category-badge @GetCategoryCssClass(idea.Category)">@GetCategoryLabel(idea.Category)</span>
+                        <span class="status-badge @GetStatusCssClass(idea.Status)">
+                            @if (idea.Status == IdeaStatus.Selected)
+                            {
+                                <span>★</span>
+                            }
+                            @GetStatusLabel(idea.Status)
+                        </span>
+                    </div>
+
+                    <h2>@idea.Title</h2>
+                    <p class="preview description">@idea.Description</p>
+
+                    <div class="meta-row"><span>👤 Team Leader</span> <strong>@idea.TeamLeaderName</strong></div>
+
+                    <div class="card-footer">
+                        @if (visibleTags.Length > 0)
+                        {
+                            <div class="tag-row">
+                                @foreach (var tag in visibleTags)
+                                {
+                                    <span class="tech-tag">@tag</span>
+                                }
+
+                                @if (remainingTags > 0)
+                                {
+                                    <span class="tech-more">+@remainingTags more</span>
+                                }
+                            </div>
+                        }
+
+                        <a class="btn-secondary-minimal card-view-button" href="/ideas/@idea.Id">View Idea</a>
+                    </div>
+                </article>
+            }
+        </section>
+    }
+</div>
+
+@code {
+    private List<IdeaDto> _ideas = [];
+    private bool _isLoading = true;
+    private bool _hasError;
+
+    private List<IdeaDto> DisplayedIdeas => _ideas
+        .OrderByDescending(idea => idea.SubmittedDate)
+        .ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadIdeasAsync();
+    }
+
+    private async Task LoadIdeasAsync()
+    {
+        _isLoading = true;
+        _hasError = false;
+
+        try
+        {
+            _ideas = (await IdeasApiClient.GetIdeasAsync()).ToList();
+        }
+        catch
+        {
+            _hasError = true;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private static List<string> GetTechnologyTags(string rawValue)
+    {
+        return rawValue
+            .Split([',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static string GetCategoryLabel(IdeaCategory category) => category switch
+    {
+        IdeaCategory.DataAndAnalytics => "Data & Analytics",
+        IdeaCategory.ProcessImprovement => "Process Improvement",
+        IdeaCategory.DeveloperTools => "Developer Tools",
+        _ => category.ToString()
+    };
+
+    private static string GetStatusLabel(IdeaStatus status) => status switch
+    {
+        IdeaStatus.NotSelected => "Not Selected",
+        IdeaStatus.Selected => "FINALIST",
+        _ => "Submitted"
+    };
+
+    private static string GetStatusCssClass(IdeaStatus status) => status switch
+    {
+        IdeaStatus.Selected => "status-selected",
+        IdeaStatus.NotSelected => "status-not-selected",
+        _ => "status-submitted"
+    };
+
+    private static string GetCategoryCssClass(IdeaCategory category) => category switch
+    {
+        IdeaCategory.AI => "cat-ai",
+        IdeaCategory.Automation => "cat-automation",
+        IdeaCategory.DataAndAnalytics => "cat-data",
+        IdeaCategory.ProcessImprovement => "cat-process",
+        IdeaCategory.DeveloperTools => "cat-dev",
+        _ => "cat-other"
+    };
+
+}

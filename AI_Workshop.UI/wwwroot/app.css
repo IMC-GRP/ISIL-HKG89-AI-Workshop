@@ -1,0 +1,113 @@
+:root {
+    --bg-primary: #060b1c;
+    --bg-secondary: #0a1229;
+    --surface: rgba(22, 33, 63, 0.62);
+    --surface-hover: rgba(32, 45, 83, 0.78);
+    --border: rgba(144, 170, 255, 0.2);
+    --text-primary: #f3f7ff;
+    --text-secondary: #a8b8df;
+    --accent-primary: #72a7ff;
+    --accent-secondary: #8c78ff;
+    --success: #3cd5ad;
+    --danger: #ff5b73;
+    --radius: 20px;
+    --shadow: 0 20px 50px rgba(5, 9, 23, 0.45);
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    margin: 0;
+    padding: 0;
+    font-family: Inter, "Segoe UI", Roboto, Arial, sans-serif;
+    color: var(--text-primary);
+    background:
+        radial-gradient(circle at 12% 15%, rgba(100, 129, 255, 0.16), transparent 30%),
+        radial-gradient(circle at 88% 10%, rgba(133, 96, 255, 0.14), transparent 28%),
+        linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 65%);
+    min-height: 100%;
+}
+
+a {
+    color: inherit;
+}
+
+h1,
+h2,
+h3,
+h4,
+p {
+    margin-top: 0;
+}
+
+h1:focus {
+    outline: none;
+}
+
+.panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(10px);
+}
+
+.btn-primary-glow,
+.btn-secondary-minimal {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    text-decoration: none;
+    padding: 0.72rem 1.25rem;
+    font-weight: 600;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.btn-primary-glow {
+    color: #ecf3ff;
+    border: 1px solid rgba(143, 180, 255, 0.48);
+    background: linear-gradient(120deg, rgba(83, 145, 255, 0.86), rgba(127, 91, 255, 0.85));
+    box-shadow: 0 10px 24px rgba(63, 109, 233, 0.34);
+}
+
+.btn-primary-glow:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 14px 28px rgba(73, 123, 255, 0.44);
+}
+
+.btn-secondary-minimal {
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.btn-secondary-minimal:hover {
+    background: rgba(124, 156, 255, 0.14);
+    transform: translateY(-1px);
+}
+
+.placeholder-page {
+    padding: 2rem;
+}
+
+.placeholder-kicker {
+    color: var(--accent-secondary);
+    letter-spacing: 0.12em;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+.placeholder-page h1 {
+    font-size: clamp(1.8rem, 3.5vw, 2.7rem);
+    margin-bottom: 0.75rem;
+}
+
+.placeholder-page p {
+    color: var(--text-secondary);
+    max-width: 62ch;
+    line-height: 1.75;
+}

@@ -1,0 +1,10 @@
+<Solution>
+  <Project Path="AI_Workshop.AI/AI_Workshop.AI.csproj">
+    <Build Solution="Debug|*" Project="false" />
+  </Project>
+  <Project Path="AI_Workshop.API/AI_Workshop.API.csproj" />
+  <Project Path="AI_Workshop.Application/AI_Workshop.Application.csproj" />
+  <Project Path="AI_Workshop.Domain/AI_Workshop.Domain.csproj" />
+  <Project Path="AI_Workshop.Infrastructure/AI_Workshop.Infrastructure.csproj" />
+  <Project Path="AI_Workshop.UI/AI_Workshop.UI.csproj" />
+</Solution>

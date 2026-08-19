@@ -1,0 +1,304 @@
+@page "/organizer"
+@rendermode InteractiveServer
+@inject TeamsApiClient TeamsApiClient
+
+<PageTitle>Organizer Dashboard</PageTitle>
+
+<div class="organizer-page">
+    <header class="panel organizer-header">
+        <p class="eyebrow">ORGANIZER DASHBOARD</p>
+        <h1>Workshop Operations Overview</h1>
+        <p class="intro-copy">Track finalist teams, monitor registration readiness, and manage team registration controls.</p>
+
+        <div class="metrics-grid">
+            <article>
+                <span>Total Ideas</span>
+                <strong>@(_summary?.TotalIdeas ?? 0)</strong>
+            </article>
+            <article>
+                <span>Submitted Ideas</span>
+                <strong>@(_summary?.SubmittedIdeas ?? 0)</strong>
+            </article>
+            <article>
+                <span>Finalist Ideas</span>
+                <strong>@(_summary?.FinalistIdeas ?? 0)</strong>
+            </article>
+            <article>
+                <span>Registered Participants</span>
+                <strong>@(_summary?.RegisteredParticipants ?? 0)</strong>
+            </article>
+            <article>
+                <span>Available Team Spots</span>
+                <strong>@(_summary?.AvailableTeamSpots ?? 0)</strong>
+            </article>
+            <article>
+                <span>Team Registration</span>
+                <strong class="status @(((_summary?.Registration.IsTeamRegistrationCurrentlyOpen ?? false) ? "open" : "closed"))">
+                    @(((_summary?.Registration.IsTeamRegistrationCurrentlyOpen ?? false) ? "Open" : "Closed"))
+                </strong>
+            </article>
+        </div>
+    </header>
+
+    <section class="panel controls-panel">
+        <h2>Team Registration Controls</h2>
+
+        @if (_summary is not null)
+        {
+            <p class="status-line">
+                Global switch: <strong>@(_summary.Registration.IsTeamRegistrationOpen ? "Enabled" : "Disabled")</strong>
+                @if (_summary.Registration.TeamRegistrationCloseDate.HasValue)
+                {
+                    <span> • Close Date (UTC): @_summary.Registration.TeamRegistrationCloseDate.Value.ToString("yyyy-MM-dd HH:mm")</span>
+                }
+                else
+                {
+                    <span> • No close date configured</span>
+                }
+            </p>
+        }
+
+        <div class="control-actions">
+            <button type="button" class="btn-primary-glow" @onclick="OpenRegistrationAsync">Open Registration</button>
+            <button type="button" class="btn-secondary-minimal" @onclick="AskCloseConfirmation">Close Registration</button>
+        </div>
+
+        @if (_confirmClose)
+        {
+            <div class="confirm-box">
+                <p>Confirm closing registration? Participants will no longer be able to join, leave, or switch teams.</p>
+                <div class="control-actions">
+                    <button type="button" class="btn-primary-glow" @onclick="CloseRegistrationAsync">Confirm Close</button>
+                    <button type="button" class="btn-secondary-minimal" @onclick="CancelCloseConfirmation">Cancel</button>
+                </div>
+            </div>
+        }
+
+        <div class="close-date-editor">
+            <label for="closeDate">Optional Registration Close Date (UTC)</label>
+            <input id="closeDate" type="datetime-local" value="@_closeDateLocal" @onchange="OnCloseDateChanged" />
+            <div class="control-actions">
+                <button type="button" class="btn-secondary-minimal" @onclick="SaveCloseDateAsync">Save Close Date</button>
+                <button type="button" class="btn-secondary-minimal" @onclick="ClearCloseDateAsync">Clear Close Date</button>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(_message))
+        {
+            <p class="message @(_isErrorMessage ? "error" : "success")">@_message</p>
+        }
+    </section>
+
+    @if (_isLoading)
+    {
+        <section class="panel feedback-panel">
+            <h2>Loading organizer dashboard...</h2>
+        </section>
+    }
+    else if (_hasError)
+    {
+        <section class="panel feedback-panel">
+            <h2>Unable to load organizer dashboard.</h2>
+            <button type="button" class="btn-primary-glow" @onclick="LoadAsync">Try Again</button>
+        </section>
+    }
+    else if (_summary is not null)
+    {
+        <section class="detail-grid">
+            <article class="panel detail-card">
+                <h2>Idea Pipeline</h2>
+                <ul>
+                    @foreach (var item in _summary.IdeaStatusCounts)
+                    {
+                        <li><span>@item.Status</span><strong>@item.Count</strong></li>
+                    }
+                </ul>
+            </article>
+
+            <article class="panel detail-card">
+                <h2>Workshop Readiness</h2>
+                <ul class="readiness-list">
+                    <li class="@GetReadinessClass(_summary.Readiness.HasFourFinalists)">Four finalist ideas selected</li>
+                    <li class="@GetReadinessClass(_summary.Readiness.HasFourTeams)">Four finalist teams available</li>
+                    <li class="@GetReadinessClass(_summary.Readiness.EachFinalistHasTeamLeader)">Each finalist has a team leader</li>
+                    <li class="@GetReadinessClass(_summary.Readiness.HasDayOneSchedule)">Day 1 schedule available</li>
+                    <li class="@GetReadinessClass(_summary.Readiness.HasDayTwoSchedule)">Day 2 schedule available</li>
+                    <li class="@GetReadinessClass(!_summary.Readiness.IsRegistrationStillOpen)">Registration closed before workshop kickoff</li>
+                </ul>
+            </article>
+        </section>
+
+        <section class="panel teams-overview">
+            <h2>Finalist Teams Overview</h2>
+            <div class="team-overview-grid">
+                @foreach (var team in _teams.OrderBy(team => team.TeamName))
+                {
+                    <article>
+                        <header>
+                            <h3>@team.TeamName</h3>
+                            <span>@team.CurrentMemberCount/@team.MaxMembers</span>
+                        </header>
+                        <p>@team.IdeaTitle</p>
+                        <ul>
+                            @foreach (var member in team.TeamMembers.OrderByDescending(member => member.IsTeamLeader).ThenBy(member => member.EmployeeName))
+                            {
+                                <li>
+                                    <span>@member.EmployeeName</span>
+                                    @if (member.IsTeamLeader)
+                                    {
+                                        <strong>Leader</strong>
+                                    }
+                                </li>
+                            }
+                        </ul>
+                    </article>
+                }
+            </div>
+        </section>
+
+        @if (_summary.MembershipConflicts.Any())
+        {
+            <section class="panel conflict-panel">
+                <h2>Membership Conflicts</h2>
+                <p>The following employees appear in multiple teams and should be corrected before workshop start.</p>
+                <ul>
+                    @foreach (var conflict in _summary.MembershipConflicts)
+                    {
+                        <li><strong>@conflict.EmployeeEmail</strong> — @string.Join(", ", conflict.TeamNames)</li>
+                    }
+                </ul>
+            </section>
+        }
+    }
+</div>
+
+@code {
+    private OrganizerDashboardSummaryDto? _summary;
+    private List<WorkshopTeamDto> _teams = [];
+    private bool _isLoading = true;
+    private bool _hasError;
+    private bool _confirmClose;
+    private string _message = string.Empty;
+    private bool _isErrorMessage;
+    private string? _closeDateLocal;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _isLoading = true;
+        _hasError = false;
+
+        try
+        {
+            _summary = await TeamsApiClient.GetOrganizerDashboardSummaryAsync();
+            _teams = (await TeamsApiClient.GetTeamsAsync()).ToList();
+            _closeDateLocal = ToDateTimeLocalInput(_summary.Registration.TeamRegistrationCloseDate);
+        }
+        catch
+        {
+            _hasError = true;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task OpenRegistrationAsync()
+    {
+        await ExecuteControlActionAsync(async () =>
+        {
+            await TeamsApiClient.OpenTeamRegistrationAsync();
+            return "Team registration opened.";
+        });
+    }
+
+    private void AskCloseConfirmation()
+    {
+        _confirmClose = true;
+    }
+
+    private void CancelCloseConfirmation()
+    {
+        _confirmClose = false;
+    }
+
+    private async Task CloseRegistrationAsync()
+    {
+        await ExecuteControlActionAsync(async () =>
+        {
+            await TeamsApiClient.CloseTeamRegistrationAsync();
+            _confirmClose = false;
+            return "Team registration closed.";
+        });
+    }
+
+    private async Task SaveCloseDateAsync()
+    {
+        await ExecuteControlActionAsync(async () =>
+        {
+            var closeDate = ParseDateTimeLocalInput(_closeDateLocal);
+            await TeamsApiClient.UpdateTeamRegistrationCloseDateAsync(closeDate);
+            return closeDate.HasValue
+                ? $"Registration close date set to {closeDate.Value:yyyy-MM-dd HH:mm} UTC."
+                : "Registration close date removed.";
+        });
+    }
+
+    private async Task ClearCloseDateAsync()
+    {
+        _closeDateLocal = null;
+        await SaveCloseDateAsync();
+    }
+
+    private async Task ExecuteControlActionAsync(Func<Task<string>> action)
+    {
+        _message = string.Empty;
+        _isErrorMessage = false;
+
+        try
+        {
+            _message = await action();
+            await LoadAsync();
+        }
+        catch
+        {
+            _isErrorMessage = true;
+            _message = "Unable to complete organizer action.";
+        }
+    }
+
+    private static string GetReadinessClass(bool isReady)
+    {
+        return isReady ? "ready" : "not-ready";
+    }
+
+    private static string? ToDateTimeLocalInput(DateTime? value)
+    {
+        return value?.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm");
+    }
+
+    private static DateTime? ParseDateTimeLocalInput(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        if (!DateTime.TryParse(value, out var parsed))
+        {
+            return null;
+        }
+
+        return DateTime.SpecifyKind(parsed, DateTimeKind.Utc);
+    }
+
+    private void OnCloseDateChanged(ChangeEventArgs args)
+    {
+        _closeDateLocal = args.Value?.ToString();
+    }
+}

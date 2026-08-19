@@ -1,0 +1,402 @@
+@page "/teams"
+@rendermode InteractiveServer
+@inject TeamsApiClient TeamsApiClient
+
+<PageTitle>Finalist Teams</PageTitle>
+
+<div class="teams-page">
+    <header class="panel teams-header">
+        <p class="eyebrow">TEAM REGISTRATION</p>
+        <h1>Join a Finalist Team</h1>
+        <p class="intro-copy">Choose one finalist team to collaborate on workshop day. Team leaders stay with their own finalist team.</p>
+
+        <div class="flow-hint" aria-label="How team registration works">
+            <span>1. Explore the finalist ideas</span>
+            <span>2. Choose the team you'd like to join</span>
+            <span>3. Enter your details and confirm</span>
+        </div>
+
+        <div class="stats-grid">
+            <article>
+                <span class="stat-label">Finalist Teams</span>
+                <strong>@_teams.Count</strong>
+            </article>
+            <article>
+                <span class="stat-label">Registered Participants</span>
+                <strong>@_teams.Sum(team => team.CurrentMemberCount)</strong>
+            </article>
+            <article>
+                <span class="stat-label">Available Spots</span>
+                <strong>@_teams.Sum(team => team.AvailableSpots)</strong>
+            </article>
+        </div>
+    </header>
+
+    @if (_isLoading)
+    {
+        <section class="panel feedback-panel">
+            <h2>Loading finalist teams...</h2>
+        </section>
+    }
+    else if (_hasError)
+    {
+        <section class="panel feedback-panel">
+            <h2>Unable to load teams.</h2>
+            <button type="button" class="btn-primary-glow" @onclick="LoadAsync">Try Again</button>
+        </section>
+    }
+    else
+    {
+        <section class="teams-grid">
+            @foreach (var team in _teams)
+            {
+                <article class="panel team-card">
+                    <div class="card-header">
+                        <span class="finalist-badge">FINALIST</span>
+                        <span class="capacity">@team.CurrentMemberCount/@team.MaxMembers</span>
+                    </div>
+
+                    <h2 class="idea-title">@team.IdeaTitle</h2>
+                    <p class="idea-category">@team.IdeaCategory</p>
+                    <p class="idea-description">@team.IdeaDescription</p>
+
+                    <p class="meta">Team Leader: <strong>@team.TeamLeaderName</strong></p>
+
+                    <div class="stats-row">
+                        <p class="meta">Team Members: <strong>@team.CurrentMemberCount / @team.MaxMembers</strong></p>
+                        <p class="meta">Available Spots: <strong>@team.AvailableSpots</strong></p>
+                    </div>
+
+                    <p class="team-status @(team.IsRegistrationCurrentlyOpen ? "open" : "closed")">
+                        @(team.IsRegistrationCurrentlyOpen ? "Registration Open" : "Registration Closed")
+                    </p>
+
+                    <div class="member-list">
+                        <p>Members</p>
+                        <ul>
+                            @if (team.TeamMembers.Count == 0)
+                            {
+                                <li class="member-empty">No members yet.</li>
+                            }
+                            else
+                            {
+                                @foreach (var member in team.TeamMembers)
+                                {
+                                    <li class="member-item">
+                                        @if (member.IsTeamLeader)
+                                        {
+                                            <div>
+                                                <span class="member-name leader">★ @member.EmployeeName</span>
+                                                <span class="member-role">Team Leader</span>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <span class="member-name">@member.EmployeeName</span>
+                                        }
+                                    </li>
+                                }
+                            }
+                        </ul>
+                    </div>
+
+                    <div class="card-actions">
+                        <a class="btn-secondary-minimal" href="@($"/ideas/{team.IdeaId}")">View Idea</a>
+                        <button type="button" class="btn-primary-glow" @onclick="() => OpenJoinModal(team)" disabled="@(!CanOpenJoinModal(team))">
+                            @GetJoinButtonLabel(team)
+                        </button>
+                    </div>
+                </article>
+            }
+        </section>
+    }
+</div>
+
+@if (_isJoinModalOpen && _selectedTeam is not null)
+{
+    <div class="modal-backdrop" @onclick="CloseJoinModal">
+        <section class="panel modal-shell" @onclick:stopPropagation="true">
+            <h2>Join Team</h2>
+            <p class="modal-team-name">@_selectedTeam.TeamName</p>
+
+            <div class="field-grid">
+                <div>
+                    <label for="joinName">Your Name *</label>
+                    <input id="joinName" @bind="_joinName" @bind:event="oninput" />
+                    @if (!string.IsNullOrWhiteSpace(_joinNameError))
+                    {
+                        <p class="field-error">@_joinNameError</p>
+                    }
+                </div>
+                <div>
+                    <label for="joinEmail">Your Email *</label>
+                    <input id="joinEmail" type="email" @bind="_joinEmail" @bind:event="oninput" />
+                    @if (!string.IsNullOrWhiteSpace(_joinEmailError))
+                    {
+                        <p class="field-error">@_joinEmailError</p>
+                    }
+                </div>
+            </div>
+
+            <p class="modal-help">Your email is used to identify your team registration.</p>
+
+            @if (!string.IsNullOrWhiteSpace(_modalError))
+            {
+                <p class="message error">@_modalError</p>
+            }
+
+            <div class="modal-actions">
+                <button type="button" class="btn-secondary-minimal" @onclick="CloseJoinModal">Cancel</button>
+                <button type="button" class="btn-primary-glow" @onclick="SubmitJoinAsync">Join Team</button>
+            </div>
+        </section>
+    </div>
+}
+
+@if (_isSwitchConfirmationOpen && _pendingSwitchTargetTeam is not null)
+{
+    <div class="modal-backdrop" @onclick="CloseSwitchConfirmation">
+        <section class="panel modal-shell" @onclick:stopPropagation="true">
+            <h2>You're already on another team</h2>
+            <p class="switch-line">You're currently a member of:</p>
+            <p class="switch-team">"@(_currentTeamNameForSwitch ?? "Unknown Team")"</p>
+            <p class="switch-line">Would you like to move to:</p>
+            <p class="switch-team">"@_pendingSwitchTargetTeam.TeamName"?</p>
+
+            @if (!string.IsNullOrWhiteSpace(_switchError))
+            {
+                <p class="message error">@_switchError</p>
+            }
+
+            <div class="modal-actions">
+                <button type="button" class="btn-secondary-minimal" @onclick="CloseSwitchConfirmation">Keep Current Team</button>
+                <button type="button" class="btn-primary-glow" @onclick="ConfirmSwitchAsync">Switch Team</button>
+            </div>
+        </section>
+    </div>
+}
+
+@if (_showToast)
+{
+    <aside class="toast @( _toastIsError ? "error" : "success")" role="status" aria-live="polite">
+        <strong>@_toastTitle</strong>
+        <span>@_toastMessage</span>
+    </aside>
+}
+
+@code {
+    private List<WorkshopTeamDto> _teams = [];
+    private bool _isLoading = true;
+    private bool _hasError;
+
+    private bool _isJoinModalOpen;
+    private WorkshopTeamDto? _selectedTeam;
+    private string _joinName = string.Empty;
+    private string _joinEmail = string.Empty;
+    private string _joinNameError = string.Empty;
+    private string _joinEmailError = string.Empty;
+    private string _modalError = string.Empty;
+
+    private bool _isSwitchConfirmationOpen;
+    private WorkshopTeamDto? _pendingSwitchTargetTeam;
+    private string? _currentTeamNameForSwitch;
+    private string _switchError = string.Empty;
+
+    private bool _showToast;
+    private bool _toastIsError;
+    private string _toastTitle = string.Empty;
+    private string _toastMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _isLoading = true;
+        _hasError = false;
+
+        try
+        {
+            _teams = (await TeamsApiClient.GetTeamsAsync()).OrderBy(team => team.TeamName).ToList();
+        }
+        catch
+        {
+            _hasError = true;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private static bool IsValidEmail(string email)
+    {
+        return new System.ComponentModel.DataAnnotations.EmailAddressAttribute().IsValid(email);
+    }
+
+    private bool CanOpenJoinModal(WorkshopTeamDto team)
+    {
+        return team.IsRegistrationCurrentlyOpen && team.AvailableSpots > 0;
+    }
+
+    private static string GetJoinButtonLabel(WorkshopTeamDto team)
+    {
+        if (!team.IsRegistrationCurrentlyOpen)
+        {
+            return "Registration Closed";
+        }
+
+        if (team.AvailableSpots <= 0)
+        {
+            return "Team Full";
+        }
+
+        return "Join Team";
+    }
+
+    private void OpenJoinModal(WorkshopTeamDto team)
+    {
+        if (!CanOpenJoinModal(team))
+        {
+            return;
+        }
+
+        _selectedTeam = team;
+        _joinNameError = string.Empty;
+        _joinEmailError = string.Empty;
+        _modalError = string.Empty;
+        _pendingSwitchTargetTeam = null;
+        _switchError = string.Empty;
+        _currentTeamNameForSwitch = null;
+        _isSwitchConfirmationOpen = false;
+        _isJoinModalOpen = true;
+    }
+
+    private void CloseJoinModal()
+    {
+        _isJoinModalOpen = false;
+        _selectedTeam = null;
+        _joinNameError = string.Empty;
+        _joinEmailError = string.Empty;
+        _modalError = string.Empty;
+    }
+
+    private void CloseSwitchConfirmation()
+    {
+        _isSwitchConfirmationOpen = false;
+        _pendingSwitchTargetTeam = null;
+        _currentTeamNameForSwitch = null;
+        _switchError = string.Empty;
+    }
+
+    private bool ValidateJoinForm()
+    {
+        _joinNameError = string.Empty;
+        _joinEmailError = string.Empty;
+
+        var isValid = true;
+
+        if (string.IsNullOrWhiteSpace(_joinName))
+        {
+            _joinNameError = "Name is required.";
+            isValid = false;
+        }
+
+        if (string.IsNullOrWhiteSpace(_joinEmail))
+        {
+            _joinEmailError = "Email is required.";
+            isValid = false;
+        }
+        else if (!IsValidEmail(_joinEmail.Trim()))
+        {
+            _joinEmailError = "Please enter a valid email address.";
+            isValid = false;
+        }
+
+        return isValid;
+    }
+
+    private async Task SubmitJoinAsync()
+    {
+        _modalError = string.Empty;
+
+        if (_selectedTeam is null || !ValidateJoinForm())
+        {
+            return;
+        }
+
+        var targetTeamName = _selectedTeam.TeamName;
+        var request = new JoinTeamRequest
+        {
+            TeamId = _selectedTeam.Id,
+            EmployeeName = _joinName.Trim(),
+            EmployeeEmail = _joinEmail.Trim()
+        };
+
+        var result = await TeamsApiClient.JoinTeamAsync(request);
+        if (result.Succeeded)
+        {
+            await LoadAsync();
+            CloseJoinModal();
+
+            if (string.Equals(result.Code, "already_member", StringComparison.OrdinalIgnoreCase))
+            {
+                ShowToast("You're already on this team.", targetTeamName, false);
+                return;
+            }
+
+            ShowToast("You're in!", $"You joined \"{targetTeamName}\".", false);
+            return;
+        }
+
+        if (result.RequiresConfirmation)
+        {
+            _pendingSwitchTargetTeam = _selectedTeam;
+            _currentTeamNameForSwitch = result.TeamName;
+            _isJoinModalOpen = false;
+            _isSwitchConfirmationOpen = true;
+            _switchError = string.Empty;
+            return;
+        }
+
+        _modalError = result.Message;
+    }
+
+    private async Task ConfirmSwitchAsync()
+    {
+        _switchError = string.Empty;
+
+        if (_pendingSwitchTargetTeam is null)
+        {
+            return;
+        }
+
+        var targetTeamName = _pendingSwitchTargetTeam.TeamName;
+        var result = await TeamsApiClient.SwitchTeamAsync(new SwitchTeamRequest
+        {
+            TargetTeamId = _pendingSwitchTargetTeam.Id,
+            EmployeeName = _joinName.Trim(),
+            EmployeeEmail = _joinEmail.Trim()
+        });
+
+        if (!result.Succeeded)
+        {
+            _switchError = result.Message;
+            return;
+        }
+
+        await LoadAsync();
+        CloseSwitchConfirmation();
+        ShowToast("Team changed successfully", $"You're now part of \"{targetTeamName}\".", false);
+    }
+
+    private void ShowToast(string title, string message, bool isError)
+    {
+        _toastTitle = title;
+        _toastMessage = message;
+        _toastIsError = isError;
+        _showToast = true;
+    }
+}
